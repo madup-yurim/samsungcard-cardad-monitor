@@ -104,11 +104,17 @@ def load_from_sheets() -> pd.DataFrame:
     values = ws.get_all_values()
     if len(values) < 2:
         return pd.DataFrame()
-    headers, rows = values[0], values[1:]
+    headers = [h.strip() for h in values[0]]
+    rows = values[1:]
     df = pd.DataFrame(rows, columns=headers)
-    df["rank"] = pd.to_numeric(df["rank"], errors="coerce")
-    df["annual_fee_domestic"] = pd.to_numeric(df["annual_fee_domestic"], errors="coerce")
-    df["total_size"] = pd.to_numeric(df["total_size"], errors="coerce")
+    if "rank" not in df.columns:
+        st.error(f"시트 컬럼 오류. 실제 컬럼: {list(df.columns)}")
+        return pd.DataFrame()
+    # 중복 헤더 행 제거 (history 시트에 헤더가 재삽입된 경우)
+    df = df[df["rank"] != "rank"].reset_index(drop=True)
+    for col in ("rank", "annual_fee_domestic", "total_size"):
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors="coerce")
     return df
 
 
