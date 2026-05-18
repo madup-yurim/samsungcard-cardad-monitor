@@ -7,6 +7,7 @@
 import os
 import pandas as pd
 import streamlit as st
+import streamlit.components.v1 as components
 import gspread
 from google.oauth2.service_account import Credentials
 
@@ -211,12 +212,6 @@ with rank_col:
     for _, r in df_display.iterrows():
         rank = int(r["rank"])
         rc = "r1" if rank == 1 else "r2" if rank == 2 else "r3" if rank == 3 else "rn"
-        fee_val = r.get("annual_fee_domestic", "")
-        try:
-            fee_int = int(fee_val)
-            fee_html = '<span class="fee fee-free">무료</span>' if fee_int == 0 else f'<span class="fee">{fee_int:,}원</span>'
-        except (ValueError, TypeError):
-            fee_html = '<span class="fee fee-free">무료</span>'
 
         rows_html += f"""
         <div class="rank-row">
@@ -228,7 +223,6 @@ with rank_col:
               {r["company_name"]}
             </div>
           </div>
-          {fee_html}
         </div>"""
 
     if not rows_html:
@@ -245,39 +239,41 @@ with rank_col:
     """, unsafe_allow_html=True)
 
 with side_col:
-    # Company bars
     co_counts = df.groupby(["company_code", "company_name"]).size().reset_index(name="cnt")
     co_counts = co_counts.sort_values("cnt", ascending=False)
     co_counts["color"] = co_counts["company_code"].map(lambda c: COMPANY_META.get(c, {}).get("color", "#888"))
     co_counts["pct"]   = (co_counts["cnt"] / len(df) * 100).round(1)
     max_cnt = co_counts["cnt"].max() if len(co_counts) > 0 else 1
 
-    bars_html = ""
+    # ── 카드사별 점유 ──────────────────────────────
+    bars_items = ""
     for _, row in co_counts.iterrows():
         w = row["cnt"] / max_cnt * 100
-        bars_html += f"""
-        <div style="margin-bottom:9px;">
-          <div style="display:flex;justify-content:space-between;margin-bottom:3px;">
-            <span style="font-size:13px;font-weight:500;color:#0f172a;">{row["company_name"]}</span>
-            <span style="font-size:11px;color:#64748b;font-family:monospace;">{int(row["cnt"])}개 <span style="color:#94a3b8;">({row["pct"]}%)</span></span>
-          </div>
-          <div style="height:5px;background:#f1f5f9;border-radius:999px;overflow:hidden;">
-            <div style="width:{w:.1f}%;height:100%;background:{row["color"]};border-radius:999px;"></div>
-          </div>
-        </div>"""
+        bars_items += (
+            f'<div style="margin-bottom:9px;">'
+            f'<div style="display:flex;justify-content:space-between;margin-bottom:3px;">'
+            f'<span style="font-size:13px;font-weight:500;color:#0f172a;">{row["company_name"]}</span>'
+            f'<span style="font-size:11px;color:#64748b;">{int(row["cnt"])}개 ({row["pct"]}%)</span>'
+            f'</div>'
+            f'<div style="height:5px;background:#f1f5f9;border-radius:999px;overflow:hidden;">'
+            f'<div style="width:{w:.1f}%;height:5px;background:{row["color"]};border-radius:999px;"></div>'
+            f'</div></div>'
+        )
 
-    st.markdown(f"""
-    <div style="background:#fff;border:1px solid #e2e8f0;border-radius:16px;
-                padding:20px 22px;box-shadow:0 4px 24px -8px rgba(0,0,0,0.06);margin-bottom:16px;">
-      <div style="font-size:11px;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;
-                  color:#94a3b8;margin-bottom:14px;">카드사별 점유</div>
-      {bars_html}
-    </div>
-    """, unsafe_allow_html=True)
+    bars_block = (
+        '<div style="font-family:system-ui,sans-serif;background:#fff;border:1px solid #e2e8f0;'
+        'border-radius:16px;padding:20px 22px;margin-bottom:12px;">'
+        '<div style="font-size:11px;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;'
+        'color:#94a3b8;margin-bottom:14px;">카드사별 점유</div>'
+        + bars_items +
+        '</div>'
+    )
+    bars_height = len(co_counts) * 46 + 70
+    components.html(bars_block, height=bars_height, scrolling=False)
 
-    # Top 10 pips
-    top10_df = df[df["rank"] <= 10]
-    pips_html = ""
+    # ── Top 10 슬롯 ────────────────────────────────
+    top10_df  = df[df["rank"] <= 10]
+    pips_items = ""
     if len(top10_df) > 0:
         top10_grp = top10_df.groupby(["company_code", "company_name"])["rank"].apply(list).reset_index()
         top10_grp["n"] = top10_grp["rank"].apply(len)
@@ -286,23 +282,27 @@ with side_col:
         for _, row in top10_grp.iterrows():
             color = COMPANY_META.get(row["company_code"], {}).get("color", "#888")
             pips = "".join(
-                f'<span style="display:inline-block;width:13px;height:13px;border-radius:3px;background:{color};margin:1px;"></span>'
+                f'<span style="display:inline-block;width:13px;height:13px;border-radius:3px;'
+                f'background:{color};margin:1px;"></span>'
                 if i in row["rank"] else
-                '<span style="display:inline-block;width:13px;height:13px;border-radius:3px;background:#f1f5f9;border:1px solid #e2e8f0;margin:1px;"></span>'
+                '<span style="display:inline-block;width:13px;height:13px;border-radius:3px;'
+                'background:#f1f5f9;border:1px solid #e2e8f0;margin:1px;"></span>'
                 for i in range(1, 11)
             )
-            pips_html += f"""
-            <div style="display:flex;justify-content:space-between;align-items:center;
-                        padding:6px 0;border-bottom:1px solid #f8fafc;">
-              <span style="font-size:13px;color:#0f172a;">{row["company_name"]}</span>
-              <div style="line-height:1;">{pips}</div>
-            </div>"""
+            pips_items += (
+                f'<div style="display:flex;justify-content:space-between;align-items:center;'
+                f'padding:6px 0;border-bottom:1px solid #f8fafc;">'
+                f'<span style="font-size:13px;color:#0f172a;">{row["company_name"]}</span>'
+                f'<div style="line-height:1;">{pips}</div></div>'
+            )
 
-    st.markdown(f"""
-    <div style="background:#fff;border:1px solid #e2e8f0;border-radius:16px;
-                padding:20px 22px;box-shadow:0 4px 24px -8px rgba(0,0,0,0.06);">
-      <div style="font-size:11px;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;
-                  color:#94a3b8;margin-bottom:14px;">Top 10 슬롯</div>
-      {pips_html if pips_html else '<div style="color:#94a3b8;font-size:13px;">데이터 없음</div>'}
-    </div>
-    """, unsafe_allow_html=True)
+    pips_block = (
+        '<div style="font-family:system-ui,sans-serif;background:#fff;border:1px solid #e2e8f0;'
+        'border-radius:16px;padding:20px 22px;">'
+        '<div style="font-size:11px;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;'
+        'color:#94a3b8;margin-bottom:14px;">Top 10 슬롯</div>'
+        + (pips_items or '<div style="color:#94a3b8;font-size:13px;">데이터 없음</div>') +
+        '</div>'
+    )
+    pips_height = len(top10_df["company_code"].unique()) * 34 + 70 if len(top10_df) > 0 else 80
+    components.html(pips_block, height=pips_height, scrolling=False)
