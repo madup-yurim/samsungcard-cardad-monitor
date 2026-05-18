@@ -101,10 +101,11 @@ def _get_creds():
 def load_from_sheets() -> pd.DataFrame:
     gc = gspread.authorize(_get_creds())
     ws = gc.open_by_key(SPREADSHEET_ID).worksheet("history")
-    records = ws.get_all_records()
-    if not records:
+    values = ws.get_all_values()
+    if len(values) < 2:
         return pd.DataFrame()
-    df = pd.DataFrame(records)
+    headers, rows = values[0], values[1:]
+    df = pd.DataFrame(rows, columns=headers)
     df["rank"] = pd.to_numeric(df["rank"], errors="coerce")
     df["annual_fee_domestic"] = pd.to_numeric(df["annual_fee_domestic"], errors="coerce")
     df["total_size"] = pd.to_numeric(df["total_size"], errors="coerce")
