@@ -213,17 +213,25 @@ with rank_col:
         rank = int(r["rank"])
         rc = "r1" if rank == 1 else "r2" if rank == 2 else "r3" if rank == 3 else "rn"
 
-        rows_html += f"""
-        <div class="rank-row">
-          <div class="rank-badge {rc}">{rank}</div>
-          <div style="min-width:0;">
-            <div class="card-name-txt">{r["card_name"]}</div>
-            <div class="card-co">
-              <span class="co-dot" style="background:{r["company_color"]}"></span>
-              {r["company_name"]}
-            </div>
-          </div>
-        </div>"""
+        title_desc = str(r.get("title_desc", "") or "")
+        desc_html = (
+            f'<div style="font-size:11px;color:#64748b;margin-top:2px;white-space:nowrap;'
+            f'overflow:hidden;text-overflow:ellipsis;">{title_desc}</div>'
+            if title_desc else ""
+        )
+        rows_html += (
+            f'<div class="rank-row">'
+            f'<div class="rank-badge {rc}">{rank}</div>'
+            f'<div style="min-width:0;">'
+            f'<div class="card-name-txt">{r["card_name"]}</div>'
+            f'<div class="card-co">'
+            f'<span class="co-dot" style="background:{r["company_color"]}"></span>'
+            f'{r["company_name"]}'
+            f'</div>'
+            f'{desc_html}'
+            f'</div>'
+            f'</div>'
+        )
 
     if not rows_html:
         rows_html = '<div style="padding:32px;text-align:center;color:#94a3b8;font-size:13px;">검색 결과가 없습니다.</div>'
